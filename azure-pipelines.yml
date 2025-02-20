@@ -1,0 +1,28 @@
+trigger:
+  - main  # Runs pipeline when code is pushed to the 'main' branch
+
+pool:
+  vmImage: 'windows-latest'  # Use a Windows VM for the build
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildBackend
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: 'Install Node.js'
+
+    - script: |
+        cd backend
+        npm install
+      displayName: 'Install Backend Dependencies'
+
+- stage: Deploy
+  jobs:
+  - job: DeployToServer
+    steps:
+    - script: |
+        echo Deploying application...
+      displayName: 'Deployment Step'
