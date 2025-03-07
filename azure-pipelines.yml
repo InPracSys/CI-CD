@@ -1,13 +1,15 @@
 trigger:
-  - main  # Runs pipeline when code is pushed to the 'main' branch
+  - main  # Runs pipeline when code is pushed to 'main' branch
 
 pool:
-  vmImage: 'windows-latest'  # Use a Windows VM for the build
+  vmImage: 'windows-latest'  # Build on Windows machine
 
 stages:
 - stage: Build
+  displayName: "Build Application"
   jobs:
   - job: BuildBackend
+    displayName: "Build Backend"
     steps:
     - task: NodeTool@0
       inputs:
@@ -17,12 +19,39 @@ stages:
     - script: |
         cd backend
         npm install
-      displayName: 'Install Backend Dependencies'
+        npm run build
+      displayName: 'Install and Build Backend'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: 'backend/dist'
+        artifactName: 'backend_artifact'
+      displayName: 'Publish Backend Artifact'
 
 - stage: Deploy
+  displayName: "Deploy to Windows Server"
   jobs:
-  - job: DeployToServer
-    steps:
-    - script: |
-        echo Deploying application...
-      displayName: 'Deployment Step'
+  - deployment: DeployBackend
+    displayName: "Deploy Backend to Windows Server"
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              artifactName: 'backend_artifact'
+              downloadPath: '$(System.ArtifactsDirectory)'
+            displayName: "Download Artifact"
+
+          - task: CopyFilesOverSSH@0
+            inputs:
+              sshEndpoint: 'MyWindowsServer'  # Configure service connection in Azure DevOps
+              sourceFolder: '$(System.ArtifactsDirectory)/backend_artifact'
+              targetFolder: 'C:\Deploy\MyApp'
+            displayName: 'Copy Files to Server'
+
+          - script: |
+              powershell Restart-Service -Name "MyAppService" -Force
+            displayName: 'Restart Application Service'
